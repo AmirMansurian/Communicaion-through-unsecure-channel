@@ -5,6 +5,11 @@
  */
 package client;
 
+import javax.crypto.BadPaddingException;
+import javax.crypto.Cipher;
+import javax.crypto.IllegalBlockSizeException;
+import javax.crypto.NoSuchPaddingException;
+import javax.crypto.spec.SecretKeySpec;
 import java.io.BufferedInputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
@@ -13,6 +18,7 @@ import java.math.BigInteger;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
 import java.security.*;
+import java.util.Base64;
 import java.util.Random;
 
 
@@ -28,7 +34,7 @@ public class Client {
     byte[] SessionKey;
     
     
-    public Client (String ip, int port) throws IOException, NoSuchAlgorithmException {
+    public Client (String ip, int port) throws IOException, NoSuchAlgorithmException, IllegalBlockSizeException, InvalidKeyException, BadPaddingException, NoSuchPaddingException {
         
             socket = new Socket(ip, port);
             System.out.println("Connected");
@@ -40,9 +46,7 @@ public class Client {
             KeyExchange(socket,  in,  out);
             SessionKeyGeneration();
 
-
-
-             System.out.println(SessionKey.length);
+            Cryptography(in ,out);
             
             
             
@@ -51,9 +55,23 @@ public class Client {
             socket.close(); 
     }
 
+    private void Cryptography(DataInputStream in, DataOutputStream out) throws NoSuchPaddingException, NoSuchAlgorithmException, InvalidKeyException, BadPaddingException, IllegalBlockSizeException, IOException {
+
+        Key AESKey = new SecretKeySpec(SessionKey, "AES");
+        Cipher cipher = Cipher.getInstance("AES/ECB/PKCS5Padding");
+        cipher.init(Cipher.ENCRYPT_MODE, AESKey);
+        byte[] encoded = cipher.doFinal("hiiiiiiiiiiiiiii".getBytes());
+        String message = Base64.getEncoder().encodeToString(encoded);
+
+
+
+        out.writeUTF(message);
+    }
+
     private void SessionKeyGeneration() throws NoSuchAlgorithmException {
 
         SessionKey =  ServerPublic.mod(PriKey).toString().getBytes();
+        System.out.println(Base64.getEncoder().encodeToString(SessionKey));
         MessageDigest digest = MessageDigest.getInstance("SHA-256");
         byte[] hash = digest.digest(SessionKey);
         SessionKey = hash;
@@ -77,12 +95,13 @@ public class Client {
         keygenerator.initialize(2048);
         KeyPair keypair = keygenerator.generateKeyPair();
 
+
         PriKey = new BigInteger(keypair.getPrivate().getEncoded());
         PubKey = new BigInteger(keypair.getPublic().getEncoded());
     }
 
 
-    public static void main(String[] args) throws IOException, NoSuchAlgorithmException {
+    public static void main(String[] args) throws IOException, NoSuchAlgorithmException, InvalidKeyException, BadPaddingException, NoSuchPaddingException, IllegalBlockSizeException {
 
         Client client = new Client("127.0.0.1", 5000);
     }

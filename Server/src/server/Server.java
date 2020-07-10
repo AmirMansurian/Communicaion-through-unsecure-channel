@@ -5,6 +5,11 @@
  */
 package server;
 
+import javax.crypto.BadPaddingException;
+import javax.crypto.Cipher;
+import javax.crypto.IllegalBlockSizeException;
+import javax.crypto.NoSuchPaddingException;
+import javax.crypto.spec.SecretKeySpec;
 import java.io.BufferedInputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
@@ -14,6 +19,7 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
 import java.security.*;
+import java.util.Base64;
 
 
 public class Server {
@@ -29,7 +35,7 @@ public class Server {
     private byte[] SessionKey;
 
     
-    public Server(int port) throws IOException, NoSuchAlgorithmException {
+    public Server(int port) throws IOException, NoSuchAlgorithmException, InvalidKeyException, NoSuchPaddingException, BadPaddingException, IllegalBlockSizeException {
         server = new ServerSocket(port);
             
         System.out.println("Server started"); 
@@ -46,13 +52,28 @@ public class Server {
         KeyExchange(socket, input, output);
         SessionKeyGeneration();
         
-        System.out.println(SessionKey.length);
+        Cryphtograpgy(input, output);
         
         
         
         output.close();
         socket.close();
         input.close();
+    }
+
+    private void Cryphtograpgy(DataInputStream input, DataOutputStream output) throws NoSuchPaddingException, NoSuchAlgorithmException, InvalidKeyException, IOException, BadPaddingException, IllegalBlockSizeException {
+
+        Key AESKey = new SecretKeySpec(SessionKey, "AES");
+        Cipher cipher = Cipher.getInstance("AES/ECB/PKCS5Padding");
+        cipher.init(Cipher.DECRYPT_MODE, AESKey);
+        System.out.println(Base64.getEncoder().encodeToString(SessionKey));
+
+        String message = input.readUTF();
+        Base64.Decoder decoder = Base64.getDecoder();
+        byte[] decoded = decoder.decode(message);
+        message = new String(cipher.doFinal(decoded));
+
+
     }
 
     private void SessionKeyGeneration() throws NoSuchAlgorithmException {
@@ -84,7 +105,7 @@ public class Server {
 
 
     
-    public static void main(String[] args) throws IOException, NoSuchAlgorithmException {
+    public static void main(String[] args) throws IOException, NoSuchAlgorithmException, NoSuchPaddingException, InvalidKeyException, BadPaddingException, IllegalBlockSizeException {
         Server server = new Server(5000);
     }
     
