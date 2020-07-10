@@ -11,6 +11,7 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.math.BigInteger;
 import java.net.Socket;
+import java.nio.charset.StandardCharsets;
 import java.security.*;
 import java.util.Random;
 
@@ -24,7 +25,7 @@ public class Client {
     private BigInteger PriKey;
     private BigInteger PubKey;
     private BigInteger ServerPublic;
-    String SessionKey;
+    byte[] SessionKey;
     
     
     public Client (String ip, int port) throws IOException, NoSuchAlgorithmException {
@@ -38,10 +39,10 @@ public class Client {
             KeyExchangeGenarator ();
             KeyExchange(socket,  in,  out);
             SessionKeyGeneration();
-            
-            
-            
-            
+
+
+
+             System.out.println(SessionKey.length);
             
             
             
@@ -50,9 +51,12 @@ public class Client {
             socket.close(); 
     }
 
-    private void SessionKeyGeneration() {
+    private void SessionKeyGeneration() throws NoSuchAlgorithmException {
 
-        SessionKey =  ServerPublic.mod(PriKey).toString();
+        SessionKey =  ServerPublic.mod(PriKey).toString().getBytes();
+        MessageDigest digest = MessageDigest.getInstance("SHA-256");
+        byte[] hash = digest.digest(SessionKey);
+        SessionKey = hash;
     }
 
     private void KeyExchange(Socket socket, DataInputStream in, DataOutputStream out) throws IOException {
@@ -78,8 +82,9 @@ public class Client {
     }
 
 
-    public static void main(String[] args) {
-        // TODO code application logic here
+    public static void main(String[] args) throws IOException, NoSuchAlgorithmException {
+
+        Client client = new Client("127.0.0.1", 5000);
     }
     
 }
