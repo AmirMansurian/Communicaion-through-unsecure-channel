@@ -5,17 +5,11 @@
  */
 package client;
 
-import javax.crypto.BadPaddingException;
-import javax.crypto.Cipher;
-import javax.crypto.IllegalBlockSizeException;
-import javax.crypto.NoSuchPaddingException;
+import javax.crypto.*;
 import javax.crypto.spec.DHGenParameterSpec;
 import javax.crypto.spec.DHParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
-import java.io.BufferedInputStream;
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
-import java.io.IOException;
+import java.io.*;
 import java.math.BigInteger;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
@@ -50,11 +44,8 @@ public class Client {
             KeyExchangeGenarator ();
             KeyExchange(socket,  in,  out);
             SessionKeyGeneration();
-
             Cryptography(in ,out);
-            
-            
-            
+
             in.close();
             out.close(); 
             socket.close(); 
@@ -65,12 +56,18 @@ public class Client {
         Key AESKey = new SecretKeySpec(SessionKey, "AES");
         Cipher cipher = Cipher.getInstance("AES/ECB/PKCS5Padding");
         cipher.init(Cipher.ENCRYPT_MODE, AESKey);
-        byte[] encoded = cipher.doFinal("hiiiiiiiiiiiiiii".getBytes());
+
+        MessageDigest digest = MessageDigest.getInstance("SHA-256");
+        byte[] encodedhash = digest.digest("hiiiiiiiiiiiiiii".getBytes(StandardCharsets.UTF_8));
+        String hash = new String(encodedhash, "UTF-8");
+        int len = 32 - hash.length();
+        for (int i=0; i<len; i++)
+            hash = "a" + hash;
+
+        byte[] encoded = cipher.doFinal(("hiiiiiiiiiiiiiii"+hash).getBytes());
         String message = Base64.getEncoder().encodeToString(encoded);
 
-
-
-        out.writeUTF(message);
+        out.writeUTF(message );
     }
 
     private void SessionKeyGeneration() throws NoSuchAlgorithmException {

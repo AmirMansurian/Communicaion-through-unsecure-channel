@@ -5,10 +5,7 @@
  */
 package server;
 
-import javax.crypto.BadPaddingException;
-import javax.crypto.Cipher;
-import javax.crypto.IllegalBlockSizeException;
-import javax.crypto.NoSuchPaddingException;
+import javax.crypto.*;
 import javax.crypto.spec.DHParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 import java.io.BufferedInputStream;
@@ -55,11 +52,8 @@ public class Server {
         KeyExchangeGenarator();
         KeyExchange(socket, input, output);
         SessionKeyGeneration();
-        
         Cryphtograpgy(input, output);
-        
-        
-        
+
         output.close();
         socket.close();
         input.close();
@@ -70,13 +64,26 @@ public class Server {
         Key AESKey = new SecretKeySpec(SessionKey, "AES");
         Cipher cipher = Cipher.getInstance("AES/ECB/PKCS5Padding");
         cipher.init(Cipher.DECRYPT_MODE, AESKey);
+
         String message = input.readUTF();
         Base64.Decoder decoder = Base64.getDecoder();
         byte[] decoded = decoder.decode(message);
-        message = new String(cipher.doFinal(decoded));
+        message = new String(cipher.doFinal(decoded), "UTF-8");
 
-        System.out.println(message);
+        String hmac = message.substring(message.length()-32, message.length());
+        message = message.substring(0, message.length()-32);
 
+        MessageDigest digest = MessageDigest.getInstance("SHA-256");
+        byte[] encodedhash = digest.digest(message.getBytes(StandardCharsets.UTF_8));
+        String hash = new String(encodedhash, "UTF-8");
+        int len = 32 - hash.length();
+        for (int i=0; i<len; i++)
+            hash = "a" + hash;
+
+        if (hash.equals(hmac))
+            System.out.println(message);
+        else
+            System.out.println("Integrity Fault");
     }
 
     private void SessionKeyGeneration() throws NoSuchAlgorithmException {
