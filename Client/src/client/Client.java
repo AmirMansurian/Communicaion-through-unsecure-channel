@@ -8,6 +8,7 @@ package client;
 import javax.crypto.*;
 import javax.crypto.spec.DHGenParameterSpec;
 import javax.crypto.spec.DHParameterSpec;
+import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 import java.io.*;
 import java.math.BigInteger;
@@ -31,6 +32,7 @@ public class Client {
     private BigInteger PubKey;
     private BigInteger ServerPublic;
     byte[] SessionKey;
+    byte[] IV = new byte[16];
     
     
     public Client (String ip, int port) throws IOException, NoSuchAlgorithmException, IllegalBlockSizeException, InvalidKeyException, BadPaddingException, NoSuchPaddingException, InvalidAlgorithmParameterException {
@@ -51,23 +53,60 @@ public class Client {
             socket.close(); 
     }
 
-    private void Cryptography(DataInputStream in, DataOutputStream out) throws NoSuchPaddingException, NoSuchAlgorithmException, InvalidKeyException, BadPaddingException, IllegalBlockSizeException, IOException {
+    private void Cryptography(DataInputStream in, DataOutputStream out) throws NoSuchPaddingException, NoSuchAlgorithmException, InvalidKeyException, BadPaddingException, IllegalBlockSizeException, IOException, InvalidAlgorithmParameterException {
 
         Key AESKey = new SecretKeySpec(SessionKey, "AES");
-        Cipher cipher = Cipher.getInstance("AES/ECB/PKCS5Padding");
-        cipher.init(Cipher.ENCRYPT_MODE, AESKey);
+        Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
+        IvParameterSpec IVV = new IvParameterSpec(IV);
+        String message = "hiiiiiii";
+        String Encrypted = "";
+        String Decrypted = "";
+
+
+        Encrypted = Encrytion(cipher, AESKey, IVV, message);
+        out.writeUTF(Encrypted);
+
+
+    }
+
+    private String Decryption(Cipher cipher, Key AESKey, IvParameterSpec IVV, String message) throws BadPaddingException, IllegalBlockSizeException, UnsupportedEncodingException, InvalidAlgorithmParameterException, InvalidKeyException, NoSuchAlgorithmException {
+
+        cipher.init(Cipher.DECRYPT_MODE, AESKey, IVV);
+        Base64.Decoder decoder = Base64.getDecoder();
+        byte[] decoded = decoder.decode(message);
+        message = new String(cipher.doFinal(decoded), "UTF-8");
+
+        String hmac = message.substring(message.length()-32, message.length());
+        message = message.substring(0, message.length()-32);
 
         MessageDigest digest = MessageDigest.getInstance("SHA-256");
-        byte[] encodedhash = digest.digest("hiiiiiiiiiiiiiii".getBytes(StandardCharsets.UTF_8));
+        byte[] encodedhash = digest.digest(message.getBytes(StandardCharsets.UTF_8));
         String hash = new String(encodedhash, "UTF-8");
         int len = 32 - hash.length();
         for (int i=0; i<len; i++)
             hash = "a" + hash;
 
-        byte[] encoded = cipher.doFinal(("hiiiiiiiiiiiiiii"+hash).getBytes());
-        String message = Base64.getEncoder().encodeToString(encoded);
+        if (!hash.equals(hmac))
+            return"Integrity Fault";
 
-        out.writeUTF(message );
+        return message;
+    }
+
+    private String Encrytion(Cipher cipher, Key AESKey, IvParameterSpec IVV, String message) throws NoSuchAlgorithmException, UnsupportedEncodingException, InvalidAlgorithmParameterException, InvalidKeyException, BadPaddingException, IllegalBlockSizeException {
+
+        cipher.init(Cipher.ENCRYPT_MODE, AESKey, IVV);
+
+        MessageDigest digest = MessageDigest.getInstance("SHA-256");
+        byte[] encodedhash = digest.digest(message.getBytes(StandardCharsets.UTF_8));
+        String hash = new String(encodedhash, "UTF-8");
+        int len = 32 - hash.length();
+        for (int i=0; i<len; i++)
+            hash = "a" + hash;
+
+        byte[] encoded = cipher.doFinal((message+hash).getBytes());
+        message = Base64.getEncoder().encodeToString(encoded);
+
+        return message;
     }
 
     private void SessionKeyGeneration() throws NoSuchAlgorithmException {
