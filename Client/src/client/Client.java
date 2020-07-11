@@ -18,6 +18,7 @@ import java.security.*;
 import java.security.spec.AlgorithmParameterSpec;
 import java.util.Base64;
 import java.util.Random;
+import java.util.Scanner;
 
 
 public class Client {
@@ -31,8 +32,9 @@ public class Client {
     private BigInteger PriKey;
     private BigInteger PubKey;
     private BigInteger ServerPublic;
-    byte[] SessionKey;
-    byte[] IV = new byte[16];
+    private byte[] SessionKey;
+    private byte[] IV = new byte[16];
+    private int NumberOfMessage;
     
     
     public Client (String ip, int port) throws IOException, NoSuchAlgorithmException, IllegalBlockSizeException, InvalidKeyException, BadPaddingException, NoSuchPaddingException, InvalidAlgorithmParameterException {
@@ -61,12 +63,50 @@ public class Client {
         String message = "hiiiiiii";
         String Encrypted = "";
         String Decrypted = "";
+        Scanner sc = new Scanner(System.in);
+        NumberOfMessage = 0;
 
+        while (true) {
 
-        Encrypted = Encrytion(cipher, AESKey, IVV, message);
-        out.writeUTF(Encrypted);
+            message = sc.nextLine();
+            Encrypted = Encrytion(cipher, AESKey, IVV, message);
+            out.writeUTF(Encrypted);
+            System.out.println("Message to Server : " + Encrypted);
+            NumberOfMessage++;
+            if (message == "bye" || message =="Bye")
+                break;
 
+            if (NumberOfMessage == 2)
+            {
+                NumberOfMessage = 0;
+                String nounce = in.readUTF();
+                Mac sha256_HMAC = Mac.getInstance("HmacSHA256");
+                SecretKeySpec secret_key = new SecretKeySpec(nounce.getBytes(), "HmacSHA256");
+                sha256_HMAC.init(secret_key);
+                SessionKey = sha256_HMAC.doFinal(message.getBytes());
+                System.out.println("Session Key Changed !!!");
+            }
 
+            message = in.readUTF();
+            Decrypted = Decryption(cipher, AESKey, IVV, message);
+            System.out.println("Message from Server : " + Decrypted);
+            NumberOfMessage++;
+            if (Decrypted.equals("bye") || Decrypted.equals("Bye"))
+                break;
+
+            if (NumberOfMessage == 2)
+            {
+                NumberOfMessage = 0;
+                String nounce = new BigInteger(512, new SecureRandom()).toString();
+                out.writeUTF(nounce);
+                Mac sha256_HMAC = Mac.getInstance("HmacSHA256");
+                SecretKeySpec secret_key = new SecretKeySpec(nounce.getBytes(), "HmacSHA256");
+                sha256_HMAC.init(secret_key);
+                SessionKey = sha256_HMAC.doFinal(message.getBytes());
+                System.out.println("Session Key Changed !!!");
+            }
+
+        }
     }
 
     private String Decryption(Cipher cipher, Key AESKey, IvParameterSpec IVV, String message) throws BadPaddingException, IllegalBlockSizeException, UnsupportedEncodingException, InvalidAlgorithmParameterException, InvalidKeyException, NoSuchAlgorithmException {
