@@ -9,6 +9,8 @@ import javax.crypto.BadPaddingException;
 import javax.crypto.Cipher;
 import javax.crypto.IllegalBlockSizeException;
 import javax.crypto.NoSuchPaddingException;
+import javax.crypto.spec.DHGenParameterSpec;
+import javax.crypto.spec.DHParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 import java.io.BufferedInputStream;
 import java.io.DataInputStream;
@@ -18,6 +20,7 @@ import java.math.BigInteger;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
 import java.security.*;
+import java.security.spec.AlgorithmParameterSpec;
 import java.util.Base64;
 import java.util.Random;
 
@@ -28,13 +31,15 @@ public class Client {
     private DataInputStream in = null;
     private DataOutputStream out =null;
 
+    private BigInteger Prime= new BigInteger("925b6a8281661b91b44ff23ffc3a2846f6e0d8ae519089d891e4b5c111a96c54c686d8c2bd599e8af6bdc3ff514756b2ba00b3adcfb912c297706bf02cc9c8ff84d0a122cfacbd4d818a9f1681fb3b202fbcba1301d59d1abaa1264ba52c1267ebd2bd9d39a9a6bb844327d3ffdf7bb26979a83caad578b0ecfbdbf8f0e28091f66c6e96b2c71ed6692e8126c8aeabc6113b6d8c2f6c36be0b806485ef72f58cbea6da92f72fef16b1fc9bac930a079be42d84de44fd63eeb8bb74462fe04f8b73cb9166cbd00a3f51b9cdaeb80d64ffcf9d61f09bc9c051c94707e970f9b3ee23fca379e7c82eb2cda76c5cd1911ae0cdffe29f0303e43a7ccf7d2821e5e24b", 16);
+    private BigInteger Generator= new BigInteger("2");
     private BigInteger PriKey;
     private BigInteger PubKey;
     private BigInteger ServerPublic;
     byte[] SessionKey;
     
     
-    public Client (String ip, int port) throws IOException, NoSuchAlgorithmException, IllegalBlockSizeException, InvalidKeyException, BadPaddingException, NoSuchPaddingException {
+    public Client (String ip, int port) throws IOException, NoSuchAlgorithmException, IllegalBlockSizeException, InvalidKeyException, BadPaddingException, NoSuchPaddingException, InvalidAlgorithmParameterException {
         
             socket = new Socket(ip, port);
             System.out.println("Connected");
@@ -70,8 +75,7 @@ public class Client {
 
     private void SessionKeyGeneration() throws NoSuchAlgorithmException {
 
-        SessionKey =  ServerPublic.mod(PriKey).toString().getBytes();
-        System.out.println(Base64.getEncoder().encodeToString(SessionKey));
+        SessionKey =  ServerPublic.modPow(PriKey, Prime).toString().getBytes();
         MessageDigest digest = MessageDigest.getInstance("SHA-256");
         byte[] hash = digest.digest(SessionKey);
         SessionKey = hash;
@@ -80,28 +84,28 @@ public class Client {
     private void KeyExchange(Socket socket, DataInputStream in, DataOutputStream out) throws IOException {
 
         out.writeUTF(PubKey.toString());
-
         String line;
         line = in.readUTF();
         ServerPublic = new BigInteger(line);
-
-
-
     }
 
-    private void KeyExchangeGenarator() throws NoSuchAlgorithmException {
+    private void KeyExchangeGenarator() throws NoSuchAlgorithmException, InvalidAlgorithmParameterException {
 
-        KeyPairGenerator keygenerator = KeyPairGenerator.getInstance("DH");
-        keygenerator.initialize(2048);
-        KeyPair keypair = keygenerator.generateKeyPair();
+        BigInteger bigInteger = Prime.subtract(new BigInteger("2"));
+        Random randNum = new Random();
+        int len = Prime.bitLength();
+        BigInteger res = new BigInteger(len, randNum);
+        if (res.compareTo(new BigInteger("2")) < 0)
+            res = res.add(new BigInteger("2"));
+        if (res.compareTo(bigInteger) >= 0)
+            res = res.mod(bigInteger).add(new BigInteger("2"));
 
-
-        PriKey = new BigInteger(keypair.getPrivate().getEncoded());
-        PubKey = new BigInteger(keypair.getPublic().getEncoded());
+        PriKey = res;
+        PubKey = Generator.modPow(PriKey, Prime);
     }
 
 
-    public static void main(String[] args) throws IOException, NoSuchAlgorithmException, InvalidKeyException, BadPaddingException, NoSuchPaddingException, IllegalBlockSizeException {
+    public static void main(String[] args) throws IOException, NoSuchAlgorithmException, InvalidKeyException, BadPaddingException, NoSuchPaddingException, IllegalBlockSizeException, InvalidAlgorithmParameterException {
 
         Client client = new Client("127.0.0.1", 5000);
     }
